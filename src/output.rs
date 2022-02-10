@@ -26,9 +26,11 @@ pub fn init_logger(config: &Config) -> Result<()> {
     log_config.set_target_level(LevelFilter::Off);
     log_config.set_thread_level(LevelFilter::Off);
 
-    let term_logger = SimpleLogger::new(filter, log_config.build());
+    let mut loggers: Vec<Box<(dyn simplelog::SharedLogger + 'static)>> = vec![];
 
-    let mut loggers: Vec<Box<(dyn simplelog::SharedLogger + 'static)>> = vec![term_logger];
+    if !config.quiet {
+        loggers.push(SimpleLogger::new(filter, log_config.build()));
+    }
 
     if let Some(log_path) = &config.log_path {
         let log_path = Path::new(log_path);

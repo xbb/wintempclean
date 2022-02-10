@@ -28,6 +28,12 @@ pub fn build_app() -> App<'static> {
                 .help("Log output to a file")
         )
         .arg(
+            Arg::new("quiet")
+                .long("quiet")
+                .short('q')
+                .help("Suppress all terminal output")
+        )
+        .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
