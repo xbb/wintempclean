@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::{App, Arg, ArgMatches};
 use humantime::format_duration;
 
@@ -35,13 +35,13 @@ impl Stats {
 }
 
 fn main() {
-    if let Err(err) = run() {
+    if let Err(err) = try_main() {
         eprintln!("{:?}", err);
         std::process::exit(1);
     }
 }
 
-fn run() -> Result<i32> {
+fn try_main() -> Result<()> {
     let matches = build_app().get_matches();
     let config = build_config(matches)?;
 
@@ -54,10 +54,7 @@ fn run() -> Result<i32> {
         println!("Removing all temporary files and directories");
     }
 
-    match begin_cleaning(&config) {
-        Ok(()) => Ok(0),
-        Err(e) => Err(anyhow!(e)),
-    }
+    begin_cleaning(&config)
 }
 
 fn build_app() -> App<'static> {
