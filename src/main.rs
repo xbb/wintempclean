@@ -1,6 +1,6 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{fs, io};
 
 use anyhow::{anyhow, Context, Result};
 use clap::{App, Arg, ArgMatches};
@@ -8,8 +8,8 @@ use humantime::format_duration;
 
 struct Config {
     dry_run: bool,
+    since: Option<Duration>,
     verbose: bool,
-    since: Duration,
 }
 
 struct Stats {
@@ -45,10 +45,10 @@ fn run() -> Result<i32> {
     let matches = build_app().get_matches();
     let config = build_config(matches)?;
 
-    if !config.since.is_zero() {
+    if let Some(duration) = config.since {
         println!(
             "Removing temporary files and directories older than {}",
-            format_duration(config.since)
+            format_duration(duration)
         );
     } else {
         println!("Removing all temporary files and directories");
@@ -90,8 +90,8 @@ fn build_config(matches: ArgMatches) -> Result<Config> {
     let dry_run = matches.is_present("dry-run");
 
     let since = match matches.value_of("created-before") {
-        Some(value) => humantime::parse_duration(value)?,
-        None => Duration::from_secs(0),
+        Some(value) => Some(humantime::parse_duration(value)?),
+        _ => None,
     };
 
     Ok(Config {
@@ -123,7 +123,7 @@ fn begin_cleaning(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn get_temp_directories() -> Result<Vec<PathBuf>, io::Error> {
+fn get_temp_directories() -> Result<Vec<PathBuf>> {
     let mut dirs = vec![
         PathBuf::from(r"C:\Windows\Temp"),
         PathBuf::from(r"C:\ProgramData\Temp"),
@@ -165,14 +165,11 @@ fn remove_dir_contents(path: &Path, config: &Config, skip_date_check: bool) -> R
         // Store size for later
         let size = meta.len();
 
-        let elapsed_since_create = meta.created()?.elapsed().unwrap_or_else(|err| {
-            // Warn and return a default duration
-            eprintln!("{:?}", err);
-            Duration::from_secs(0)
-        });
-
-        // Don't mind create date if subdir
-        if skip_date_check || elapsed_since_create >= config.since {
+        // Don't mind create date if subdir or no duration given
+        if skip_date_check
+            || config.since.is_none()
+            || create_date_older_than_duration(&meta, config.since.unwrap())
+        {
             // Recurse into subdir and sum stats
             if meta.is_dir() {
                 // Try remove sub contents
@@ -225,6 +222,19 @@ fn remove_entry(entry: &fs::DirEntry, config: &Config) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn create_date_older_than_duration(meta: &fs::Metadata, duration: Duration) -> bool {
+    let elapsed = (|| -> anyhow::Result<Duration> { Ok(meta.created()?.elapsed()?) })();
+
+    return match elapsed {
+        Ok(elapsed) => elapsed >= duration,
+        Err(err) => {
+            // Warn and return false
+            eprintln!("{:?}", err);
+            false
+        }
+    };
 }
 
 // https://www.sqlservercentral.com/blogs/powershell-using-exponents-and-logs-to-format-byte-sizes
