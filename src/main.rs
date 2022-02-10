@@ -105,11 +105,10 @@ fn begin_cleaning(config: &Config) -> Result<()> {
                 println!("Cleaning: {:?}", &tmp_path)
             }
             if let Ok(stats) = remove_dir_contents(&tmp_path, &config, false) {
-                println!(
-                    "Removed {} entries ({} {}) with {} errors from path {}",
+                info!(
+                    "Removed {} entries ({}) with {} errors from path {}",
                     stats.removed_count,
                     format_bytes(stats.removed_bytes as f64),
-                    stats.removed_bytes,
                     stats.errors_total,
                     tmp_path.display()
                 );
