@@ -1,16 +1,20 @@
+mod app;
+mod config;
+mod output;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use clap::{App, Arg, ArgMatches};
 use humantime::format_duration;
 
-struct Config {
-    dry_run: bool,
-    since: Option<Duration>,
-    verbose: bool,
-}
+use crate::app::build_app;
+use crate::config::{build_config, Config};
+use crate::output::{init_logger, print_err};
+
+#[macro_use]
+extern crate log;
 
 struct Stats {
     errors_total: u64,
@@ -36,7 +40,11 @@ impl Stats {
 
 fn main() {
     if let Err(err) = try_main() {
-        eprintln!("{:?}", err);
+        if log_enabled!(log::Level::Error) {
+            print_err(err);
+        } else {
+            eprintln!("{:?}", err);
+        }
         std::process::exit(1);
     }
 }
@@ -45,65 +53,25 @@ fn try_main() -> Result<()> {
     let matches = build_app().get_matches();
     let config = build_config(matches)?;
 
+    init_logger(&config)?;
+
     if let Some(duration) = config.since {
-        println!(
+        info!(
             "Removing temporary files and directories older than {}",
             format_duration(duration)
         );
     } else {
-        println!("Removing all temporary files and directories");
+        info!("Removing all temporary files and directories");
     }
 
     begin_cleaning(&config)
 }
 
-fn build_app() -> App<'static> {
-    App::new(clap::crate_name!())
-        .version(clap::crate_version!())
-        .arg(
-            Arg::new("created-before")
-                .long("created-before")
-                .short('b')
-                .takes_value(true)
-                .value_name("duration")
-                .number_of_values(1)
-                .help("Removes only the files created before the specified duration (60s, 10d, 1m, 1y)"),
-        )
-        .arg(
-            Arg::new("dry-run")
-                .long("dry-run")
-                .short('n')
-                .help("Doesn't actually remove the files")
-        )
-        .arg(
-            Arg::new("verbose")
-                .long("verbose")
-                .short('v')
-                .help("Shows what files are removed")
-        )
-}
-
-fn build_config(matches: ArgMatches) -> Result<Config> {
-    let dry_run = matches.is_present("dry-run");
-
-    let since = match matches.value_of("created-before") {
-        Some(value) => Some(humantime::parse_duration(value)?),
-        _ => None,
-    };
-
-    Ok(Config {
-        dry_run,
-        verbose: matches.is_present("verbose"),
-        since,
-    })
-}
-
 fn begin_cleaning(config: &Config) -> Result<()> {
     for tmp_path in get_temp_directories()? {
         if tmp_path.exists() {
-            if config.verbose {
-                println!("Cleaning: {:?}", &tmp_path)
-            }
+            debug!("Cleaning: {:?}", &tmp_path);
+
             if let Ok(stats) = remove_dir_contents(&tmp_path, &config, false) {
                 info!(
                     "Removed {} entries ({}) with {} errors from path {}",
@@ -201,9 +169,7 @@ fn remove_entry(entry: &fs::DirEntry, config: &Config) -> Result<()> {
     let dry_run_tag = if config.dry_run { " (dry run)" } else { "" };
     let path = entry.path();
 
-    if config.verbose {
-        println!("Removing{} {}", dry_run_tag, path.display());
-    }
+    debug!("Removing{} {}", dry_run_tag, path.display());
 
     if !config.dry_run {
         return if path.is_dir() {
@@ -227,7 +193,7 @@ fn create_date_older_than_duration(meta: &fs::Metadata, duration: Duration) -> b
         Ok(elapsed) => elapsed >= duration,
         Err(err) => {
             // Warn and return false
-            eprintln!("{:?}", err);
+            print_err(err);
             false
         }
     };
@@ -249,12 +215,4 @@ fn format_bytes(bytes: f64) -> String {
     let unit = units[idx as usize];
 
     format!("{}{:.2} {}", negative_sign, scaled, unit)
-}
-
-fn print_err(err: anyhow::Error) {
-    eprintln!("Error: {}", err);
-    err.chain()
-        .skip(1)
-        .for_each(|cause| eprintln!("  Cause: {}", cause));
-    eprintln!();
 }

@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 humantime = "2.1"
+log = "0.4"
 
 [dependencies.anyhow]
 version = "1.0"
@@ -16,6 +17,11 @@ features = ["backtrace"]
 version = "3.0"
 default-features = false
 features = ["suggestions", "std", "cargo"]
+
+[dependencies.simplelog]
+version = "0.11"
+default-features = false
+features = []
 
 [profile.release]
 lto = true
