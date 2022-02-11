@@ -72,7 +72,7 @@ fn begin_cleaning(config: &Config) -> Result<()> {
         if tmp_path.exists() {
             debug!("Cleaning: {:?}", &tmp_path);
 
-            if let Ok(stats) = remove_dir_contents(&tmp_path, &config, false) {
+            if let Ok(stats) = remove_dir_contents(&tmp_path, config, false) {
                 info!(
                     "Removed {} entries ({}) with {} errors from path {}",
                     stats.removed_count,
@@ -152,7 +152,7 @@ fn remove_dir_contents(path: &Path, config: &Config, skip_date_check: bool) -> R
             }
 
             // Remove entry or report error
-            if let Err(err) = remove_entry(&entry, &config) {
+            if let Err(err) = remove_entry(&entry, config) {
                 stats.errors_total += 1;
                 print_err(err);
             } else {
@@ -187,16 +187,16 @@ fn remove_entry(entry: &fs::DirEntry, config: &Config) -> Result<()> {
 }
 
 fn create_date_older_than_duration(meta: &fs::Metadata, duration: Duration) -> bool {
-    let elapsed = (|| -> anyhow::Result<Duration> { Ok(meta.created()?.elapsed()?) })();
+    let elapsed = (|| -> Result<Duration> { Ok(meta.created()?.elapsed()?) })();
 
-    return match elapsed {
+    match elapsed {
         Ok(elapsed) => elapsed >= duration,
         Err(err) => {
             // Warn and return false
             print_err(err);
             false
         }
-    };
+    }
 }
 
 // https://www.sqlservercentral.com/blogs/powershell-using-exponents-and-logs-to-format-byte-sizes

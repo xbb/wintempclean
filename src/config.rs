@@ -21,7 +21,7 @@ pub fn build_config(matches: ArgMatches) -> Result<Config> {
         dry_run: matches.is_present("dry-run"),
         quiet: matches.is_present("quiet"),
         verbose: matches.is_present("verbose"),
-        log_path: matches.value_of("log").and_then(|x| Some(x.to_string())),
+        log_path: matches.value_of("log").map(|x| x.to_string()),
         since,
     };
 
