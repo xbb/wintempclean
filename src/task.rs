@@ -5,11 +5,16 @@ use std::io::Write as IoWrite;
 use std::process::{Command, Stdio};
 
 use crate::output::open_log_file;
-use anyhow::Result;
+use crate::windows::is_app_elevated;
+use anyhow::{bail, Result};
 
 use super::*;
 
 pub fn install_task(config: &Config) -> Result<()> {
+    if !is_app_elevated() {
+        bail!("--install-task required administrator privileges");
+    }
+
     let task_name = clap::crate_name!();
     let args = parse_args(config)?;
 

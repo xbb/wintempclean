@@ -270,4 +270,5 @@ dependencies = [
  "humantime",
  "log",
  "simplelog",
+ "winapi",
 ]

@@ -2,6 +2,7 @@ mod app;
 mod config;
 mod output;
 mod task;
+mod windows;
 
 use std::fs;
 use std::path::{Path, PathBuf};
