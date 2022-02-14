@@ -1,6 +1,7 @@
 mod app;
 mod config;
 mod output;
+mod task;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ use humantime::format_duration;
 use crate::app::build_app;
 use crate::config::{build_config, Config};
 use crate::output::{init_logger, print_err};
+use crate::task::install_task;
 
 #[macro_use]
 extern crate log;
@@ -51,9 +53,13 @@ fn main() {
 
 fn try_main() -> Result<()> {
     let matches = build_app().get_matches();
-    let config = build_config(matches)?;
+    let config = build_config(&matches)?;
 
     init_logger(&config)?;
+
+    if matches.is_present("install-task") {
+        return install_task(&config);
+    }
 
     if let Some(duration) = config.since {
         info!(

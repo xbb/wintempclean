@@ -19,6 +19,11 @@ pub fn build_app() -> App<'static> {
                 .help("Doesn't actually remove the files")
         )
         .arg(
+            Arg::new("install-task")
+            .long("install-task")
+            .help("Creates a new task in the scheduler for cleaning during startup as SYSTEM user")
+        )
+        .arg(
             Arg::new("log")
                 .long("log")
                 .short('l')
