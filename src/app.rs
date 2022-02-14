@@ -10,7 +10,7 @@ pub fn build_app() -> App<'static> {
                 .takes_value(true)
                 .value_name("duration")
                 .number_of_values(1)
-                .help("Removes only the files created before the specified duration (60s, 10d, 1m, 1y)"),
+                .help("Removes only the files created before the specified duration (60s, 10m, 10h, 10d, 10days 2min, etc...)"),
         )
         .arg(
             Arg::new("dry-run")
