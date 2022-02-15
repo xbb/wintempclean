@@ -25,6 +25,7 @@ pub fn init_logger(config: &Config) -> Result<()> {
     log_config.set_max_level(LevelFilter::Off);
     log_config.set_target_level(LevelFilter::Off);
     log_config.set_thread_level(LevelFilter::Off);
+    log_config.set_time_to_local(true);
 
     let mut loggers: Vec<Box<(dyn simplelog::SharedLogger + 'static)>> = vec![];
 
