@@ -25,7 +25,7 @@ features = []
 
 [dependencies.winapi]
 version = "0.3.9"
-features = ["handleapi", "processthreadsapi", "winnt", "securitybaseapi", "impl-default"]
+features = ["handleapi", "processthreadsapi", "winnt", "securitybaseapi", "impl-default", "winbase"]
 
 [profile.release]
 lto = true

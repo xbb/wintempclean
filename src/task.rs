@@ -1,12 +1,13 @@
-use std::env::current_exe;
 use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
+use std::os::windows::process::CommandExt;
+use std::process::Stdio;
+use std::{io, thread};
 
-use std::process::{Command, Stdio};
+use anyhow::{bail, Result};
 
 use crate::output::open_log_file;
 use crate::windows::is_app_elevated;
-use anyhow::{bail, Result};
 
 use super::*;
 
@@ -74,6 +75,11 @@ fn run_script(task_path: &str, task_name: &str, clean_args: &[String]) -> Result
     writeln!(
         script,
         "\
+trap
+{{
+    write-output $_
+    exit 1
+}}
 $ErrorActionPreference = \"Stop\"
 $currentExe = \"{}\"
 $action = New-ScheduledTaskAction -Execute \"$currentExe\" -Argument \"{}\"
@@ -82,24 +88,48 @@ $settings = New-ScheduledTaskSettingsSet
 $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings
 Register-ScheduledTask -Force -TaskPath \"{}\" -TaskName \"{}\" -InputObject $task -User SYSTEM
     ",
-        current_exe()?.display(),
+        std::env::current_exe()?.display(),
         clean_args.join(" "),
         task_path,
         task_name
     )?;
 
-    // println!("Script:\n{}", script);
+    let mut process = std::process::Command::new("powershell.exe")
+        // -WindowStyle Hidden not included because it makes the child process detach early
+        .args(&["-NonInteractive", "-NoProfile", "-Command", "-"])
+        // Don't create a window for the spawned process
+        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::piped())
+        .spawn()?;
 
-    let mut cmd = Command::new("powershell.exe");
-    cmd.args(&["-NoProfile", "-WindowStyle", "Hidden", "-Command", "-"]);
-    cmd.stdin(Stdio::piped());
+    let mut child_out = process.stdout.take().unwrap();
+    let mut child_err = process.stderr.take().unwrap();
+    let mut child_in = process.stdin.take().unwrap();
 
-    let mut process = cmd.spawn()?;
-    let stdin = process.stdin.as_mut().unwrap();
+    let out_thread = thread::spawn(move || {
+        io::copy(&mut child_out, &mut io::stdout()).unwrap();
+    });
 
-    stdin.write_all(script.as_bytes())?;
+    let err_thread = thread::spawn(move || {
+        io::copy(&mut child_err, &mut io::stderr()).unwrap();
+    });
 
-    process.wait()?;
+    let in_thread = thread::spawn(move || {
+        child_in.write_all(script.as_bytes()).unwrap();
+    });
+
+    let status = process.wait()?;
+    in_thread.join().unwrap();
+    err_thread.join().unwrap();
+    out_thread.join().unwrap();
+
+    if status.success() {
+        println!("Task created successfully");
+    } else {
+        bail!("Error while creating the task");
+    }
 
     Ok(())
 }
