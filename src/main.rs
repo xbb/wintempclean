@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use humantime::format_duration;
 
 use crate::app::build_app;
@@ -159,7 +159,7 @@ fn remove_dir_contents(path: &Path, config: &Config, skip_date_check: bool) -> R
             }
 
             // Remove entry or report error
-            if let Err(err) = remove_entry(&entry, config) {
+            if let Err(err) = remove_entry(&entry, &meta, config) {
                 stats.errors_total += 1;
                 print_err(err);
             } else {
@@ -172,13 +172,32 @@ fn remove_dir_contents(path: &Path, config: &Config, skip_date_check: bool) -> R
     Ok(stats)
 }
 
-fn remove_entry(entry: &fs::DirEntry, config: &Config) -> Result<()> {
+fn remove_entry(entry: &fs::DirEntry, metadata: &fs::Metadata, config: &Config) -> Result<()> {
     let dry_run_tag = if config.dry_run { " (dry run)" } else { "" };
     let path = entry.path();
 
     debug!("Removing{} {}", dry_run_tag, path.display());
 
+    let mut perms = metadata.permissions();
+
+    // Unset readonly flag if present
+    let perms_changed = if perms.readonly() {
+        debug!("Disabling readonly flag");
+        perms.set_readonly(false);
+        true
+    } else {
+        false
+    };
+
     if !config.dry_run {
+        // Apply changed permissions
+        if perms_changed {
+            if let Err(err) = fs::set_permissions(&path, perms)
+                .with_context(|| format!("failed to unset readonly permission {}", path.display()))
+            {
+                bail!(err)
+            }
+        }
         return if path.is_dir() {
             // Remove dir and return
             fs::remove_dir(&path)
